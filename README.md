@@ -127,6 +127,18 @@ In [SoundSource](https://rogueamoeba.com/soundsource/), click **Add Effect** on 
 device and pick **EarComp → EarComp**.
 If you also use Mimi's Chrome extension, turn it off, otherwise browser audio is processed twice.
 
+### Switching between speakers and headphones from outside
+
+EarComp keeps two small files in `~/Library/Application Support/EarComp/`:
+- `status.json`, written four times a second: the current mode, the input level and the
+  parameters it is applying.
+- `control.json`, read whenever it changes: `{"mode": "speakers"}` selects *Speakers: Mimi
+  match, hiss guard*, `{"mode": "headphones"}` selects *Headphones: right ear +6 dB, hiss
+  guard*. The switch takes effect within a quarter second, without touching the host. The
+  mode is also applied when the plugin starts, so it survives restarts.
+
+Anything that can write a file can switch it: a hotkey, a Launchpad pad, a script.
+
 ### Updating a running SoundSource setup
 
 SoundSource only loads a new plugin binary when it reloads the effect, and it owns the system

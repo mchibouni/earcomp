@@ -40,6 +40,14 @@ while pgrep -x SoundSource >/dev/null; do
     sleep 0.2
 done
 
+# SoundSource hosts plugins in RemoteAUHost processes that can outlive it: stop the one running
+# EarComp, or the old binary stays loaded
+for pid in $(pgrep -f RemoteAUHost); do
+    if lsof -p "$pid" 2>/dev/null | grep -q 'EarComp.component/Contents/MacOS/EarComp'; then
+        kill -TERM "$pid" && echo "stopped plugin host $pid"
+    fi
+done
+
 DEST="$HOME/Library/Audio/Plug-Ins/Components"
 mkdir -p "$DEST"
 rm -rf "$DEST/EarComp.component"
@@ -49,11 +57,11 @@ echo "installed $DEST/EarComp.component"
 python3 -I tools/soundsource_earcomp.py "$@"
 
 env -i /usr/bin/open -g -b com.rogueamoeba.soundsource
-sleep 4
+sleep 7
 
 out=$(mktemp)
 # hs -c can hang now and then: run it in the background and give up after a few seconds
-( hs -c "return dofile(\"$PWD/tools/soundsource-check.lua\")(\"$out\")" >/dev/null 2>&1 & hp=$!; sleep 5; kill $hp 2>/dev/null ) || true
+( hs -c "return dofile(\"$PWD/tools/soundsource-check.lua\")(\"$out\")" </dev/null >/dev/null 2>&1 & hp=$!; sleep 5; kill $hp 2>/dev/null ) || true
 echo "SoundSource output effects (name | enabled | preset):"
 cat "$out"
 rm -f "$out"

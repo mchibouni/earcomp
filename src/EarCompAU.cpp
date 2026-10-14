@@ -1,7 +1,9 @@
 // EarComp Audio Unit (v2 component): wraps the Processor for hosts like SoundSource.
 #include <AudioUnitSDK/AUEffectBase.h>
+#include <AudioToolbox/AudioUnitUtilities.h>
 #include "MimiTables.h"
 #include "Processor.hpp"
+#include "Status.hpp"
 
 namespace {
 
@@ -27,6 +29,8 @@ constexpr PresetValues kPresetValues[] = {
     {100.0f, 0.0f, 10.0f, -60.0f},
 };
 constexpr int kNumPresets = sizeof(kPresetValues) / sizeof(kPresetValues[0]);
+// presets that control.json's "mode" selects
+constexpr int kSpeakersPreset = 1, kHeadphonesPreset = 3;
 
 } // namespace
 
@@ -39,8 +43,18 @@ public:
 
     OSStatus Initialize() override {
         OSStatus err = AUEffectBase::Initialize();
-        if (err == noErr) processor_.prepare(GetSampleRate());
+        if (err == noErr) {
+            processor_.prepare(GetSampleRate());
+            status_.start(&processor_, GetSampleRate(), [this](const std::string& mode) {
+                selectPresetFromOutside(mode == "headphones" ? kHeadphonesPreset : kSpeakersPreset);
+            });
+        }
         return err;
+    }
+
+    void Cleanup() override {
+        status_.stop();
+        AUEffectBase::Cleanup();
     }
 
     OSStatus Reset(AudioUnitScope scope, AudioUnitElement element) override {
@@ -129,13 +143,27 @@ public:
         processor_.variant.store(int(GetParameter(kParamVariant) + 0.5f), std::memory_order_relaxed);
         processor_.rightTrebleDb.store(GetParameter(kParamRightTreble), std::memory_order_relaxed);
         processor_.hissGuardDb.store(GetParameter(kParamHissGuard), std::memory_order_relaxed);
-        processor_.process(static_cast<const float*>(in.mBuffers[0].mData), static_cast<const float*>(in.mBuffers[1].mData),
-                           static_cast<float*>(out.mBuffers[0].mData), static_cast<float*>(out.mBuffers[1].mData), int(frames));
+        const auto* inL = static_cast<const float*>(in.mBuffers[0].mData);
+        const auto* inR = static_cast<const float*>(in.mBuffers[1].mData);
+        status_.measure(inL, inR, int(frames));  // before processing: in and out may be the same buffers
+        processor_.process(inL, inR, static_cast<float*>(out.mBuffers[0].mData), static_cast<float*>(out.mBuffers[1].mData), int(frames));
         flags &= ~kAudioUnitRenderAction_OutputIsSilence;
         return noErr;
     }
 
 private:
+    // Called on the status thread when control.json changes mode. Parameter values are atomic
+    // in the SDK; the host is told about the new values and preset so its display follows.
+    void selectPresetFromOutside(int n) {
+        applyPreset(n);
+        SetAFactoryPresetAsCurrent(kPresets[n]);
+        for (AudioUnitParameterID id : {kParamIntensity, kParamVariant, kParamRightTreble, kParamHissGuard}) {
+            AudioUnitParameter param{GetComponentInstance(), id, kAudioUnitScope_Global, 0};
+            AUParameterListenerNotify(nullptr, nullptr, &param);
+        }
+        PropertyChanged(kAudioUnitProperty_PresentPreset, kAudioUnitScope_Global, 0);
+    }
+
     void applyPreset(int n) {
         Globals()->SetParameter(kParamIntensity, kPresetValues[n].intensity);
         Globals()->SetParameter(kParamVariant, kPresetValues[n].variant);
@@ -144,6 +172,7 @@ private:
     }
 
     earcomp::Processor processor_;
+    earcomp::StatusReporter status_;  // after processor_: destroyed first, stops its thread
 };
 
 AUSDK_COMPONENT_ENTRY(ausdk::AUBaseFactory, EarCompAU)

@@ -12,7 +12,7 @@ CXXFLAGS := -isysroot $(SDK) -std=c++23 -O2 -Wall -Wextra -arch arm64 -mmacosx-v
             -fvisibility=hidden -I$(AUSDK)/include
 AUSDK_SRC := AUBase AUBuffer AUBufferAllocator AUEffectBase AUInputElement AUOutputElement \
              AUPlugInDispatch AUScopeElement ComponentBase
-SRC := src/EarCompAU.cpp src/Processor.cpp $(AUSDK_SRC:%=$(AUSDK)/src/AudioUnitSDK/%.cpp)
+SRC := src/EarCompAU.cpp src/Processor.cpp src/Status.cpp $(AUSDK_SRC:%=$(AUSDK)/src/AudioUnitSDK/%.cpp)
 BUNDLE := build/EarComp.component
 DEST := $(HOME)/Library/Audio/Plug-Ins/Components
 
@@ -21,7 +21,7 @@ all: $(BUNDLE) build/probe
 src/MimiTables.h: data/mimi-map.json tools/gen_tables.py
 	python3 -I tools/gen_tables.py
 
-$(BUNDLE): $(SRC) src/Processor.hpp src/MimiTables.h Info.plist
+$(BUNDLE): $(SRC) src/Processor.hpp src/Status.hpp src/MimiTables.h Info.plist
 	mkdir -p $(BUNDLE)/Contents/MacOS
 	cp Info.plist $(BUNDLE)/Contents/Info.plist
 	$(CXX) $(CXXFLAGS) -bundle -o $(BUNDLE)/Contents/MacOS/EarComp $(SRC) \

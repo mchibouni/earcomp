@@ -25,6 +25,15 @@ Processor::Processor() {
     fft_ = vDSP_create_fftsetup(kLog2FFT, kFFTRadix2);
     for (int n = 0; n < kFFT; ++n)  // periodic Hann, square-rooted
         window_[n] = std::sqrt(0.5f * (1.0f - std::cos(2.0f * float(M_PI) * n / kFFT)));
+    // Low-delay synthesis: analysis x synthesis = a 192-sample Hann placed over the last three
+    // hops of the frame. The newest frame then adds nothing to the oldest hop still in the
+    // accumulator, so that hop can be output one hop earlier (latency 192 instead of 256).
+    constexpr int kTail = kFFT - kHop;
+    for (int n = 0; n < kFFT; ++n) {
+        if (n < kHop) { synthWindow_[n] = 0.0f; continue; }
+        float h = 0.5f * (1.0f - std::cos(2.0f * float(M_PI) * (n - kHop) / kTail));
+        synthWindow_[n] = h / window_[n];
+    }
     // window power for a full-scale sine: one-sided bin power sum = (N/2) * (A^2/2) * sum(w^2)
     float w2 = 0.0f;
     for (float w : window_) w2 += w * w;
@@ -147,8 +156,8 @@ void Processor::processFrame() {
     }
 
     // synthesis: apply gains, inverse FFT, window, overlap-add
-    // zrip forward+inverse scales by 2N; sqrt-Hann^2 at 75% overlap sums to 2
-    const float scale = 1.0f / (2.0f * kFFT * 2.0f);
+    // zrip forward+inverse scales by 2N; the 192-sample Hann products overlap 3x and sum to 1.5
+    const float scale = 1.0f / (2.0f * kFFT * 1.5f);
     for (int c = 0; c < 2; ++c) {
         const float* g = c == 0 ? gainL_ : gainR_;
         re_[c][0] *= g[0];
@@ -160,9 +169,10 @@ void Processor::processFrame() {
         DSPSplitComplex z{re_[c], im_[c]};
         vDSP_fft_zrip(fft_, &z, 1, kLog2FFT, kFFTDirection_Inverse);
         vDSP_ztoc(&z, 1, reinterpret_cast<DSPComplex*>(frame_), 2, kFFT / 2);
-        for (int n = 0; n < kFFT; ++n) accum_[c][n] += frame_[n] * window_[n] * scale;
+        for (int n = kHop; n < kFFT; ++n) accum_[c][n] += frame_[n] * synthWindow_[n] * scale;
 
-        std::memcpy(outFifo_[c], accum_[c], kHop * sizeof(float));
+        // accum[kHop, 2*kHop) is now complete: later frames add nothing to it
+        std::memcpy(outFifo_[c], accum_[c] + kHop, kHop * sizeof(float));
         std::memmove(accum_[c], accum_[c] + kHop, (kFFT - kHop) * sizeof(float));
         std::memset(accum_[c] + kFFT - kHop, 0, kHop * sizeof(float));
         std::memmove(inFifo_[c], inFifo_[c] + kHop, kFifoLatency * sizeof(float));

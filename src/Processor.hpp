@@ -14,7 +14,7 @@ public:
     static constexpr int kLog2FFT = 8;
     static constexpr int kBins = kFFT / 2 + 1;
     static constexpr int kFifoLatency = kFFT - kHop;   // input FIFO offset
-    static constexpr int kLatency = kFFT;              // measured input->output delay
+    static constexpr int kLatency = kFFT - kHop;       // input->output delay (192, like Mimi)
 
     Processor();
     ~Processor();
@@ -39,7 +39,8 @@ private:
 
     double sampleRate_ = 48000.0;
     FFTSetup fft_ = nullptr;
-    float window_[kFFT];                       // sqrt-Hann, used for analysis and synthesis
+    float window_[kFFT];                       // analysis window: sqrt-Hann
+    float synthWindow_[kFFT];                  // synthesis window, zero over the first hop
     float inFifo_[2][kFFT];
     float outFifo_[2][kHop];
     float accum_[2][kFFT];

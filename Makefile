@@ -2,6 +2,7 @@
 # make            -> build/EarComp.component + build/probe
 # make install    -> copy to ~/Library/Audio/Plug-Ins/Components and run auval
 # make check      -> probe vs the measured Mimi map
+# make stage      -> install and reload it in SoundSource (tools/stage.sh), PRESET=n optional
 
 export DEVELOPER_DIR := /Applications/Xcode.app/Contents/Developer
 SDK := $(shell DEVELOPER_DIR=$(DEVELOPER_DIR) xcrun --sdk macosx --show-sdk-path)
@@ -41,7 +42,10 @@ install: $(BUNDLE)
 	cp -R $(BUNDLE) $(DEST)/
 	auval -v aufx Ercp EarC | tail -5
 
+stage:
+	tools/stage.sh $(PRESET)
+
 clean:
 	rm -rf build
 
-.PHONY: all check install clean
+.PHONY: all check install stage clean

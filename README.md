@@ -127,6 +127,17 @@ In [SoundSource](https://rogueamoeba.com/soundsource/), click **Add Effect** on 
 device and pick **EarComp → EarComp**.
 If you also use Mimi's Chrome extension, turn it off, otherwise browser audio is processed twice.
 
+### Updating a running SoundSource setup
+
+SoundSource only loads a new plugin binary when it reloads the effect, and it owns the system
+volume, so a restart can make playback jump in level. `make stage PRESET=1` (or
+`tools/stage.sh 1`) does the whole update: it mutes the Mac's playback channel in TotalMix over
+OSC, quits SoundSource, installs the new build, points SoundSource's saved EarComp effect at it
+(optionally with a preset), relaunches SoundSource, reads the effect chain back through
+Hammerspoon and unmutes. A watchdog restores SoundSource and sound after 60 s if anything stalls.
+It assumes the EarComp effect was added once by hand, TotalMix's OSC remote is on, and
+Hammerspoon is installed.
+
 ## Notes
 
 - This is a personal listening tool, not a medical device or a hearing aid.

@@ -7,18 +7,26 @@ and gives my weaker right ear a bit more treble.
 
 ## Why I built this
 
-I have tinnitus in my right ear, which is also my weaker ear. I took Mimi's hearing test with my
-Focal Bathys (it is built into the Focal & Naim app), and Mimi's sound personalization did a very
-nice job, on the Bathys and on my Audio-Technica ATH-R70x.
+I have tinnitus in my right ear, which is also my weaker ear. I took [Mimi](https://mimi.io)'s
+hearing test with my [Focal Bathys](https://www.focal.com/products/bathys) (it is built into the
+[Focal & Naim app](https://www.focal.com/focal-naim-app/)), and Mimi's sound personalization did
+a very nice job, on the Bathys and on my
+[Audio-Technica ATH-R70x](https://www.audio-technica.com/en-us/ath-r70x).
 
-At my desk I listen on a HiFiMAN Edition XV plugged into an RME Babyface Pro FS. On the Mac,
-Mimi only exists as a Chrome extension, so the personalization only reached browser tabs.
-Music apps, Live, my synth plugins and everything else played without it.
+At my desk I listen on a [HiFiMAN Edition XV](https://hifiman.com/products/edition-xv) plugged
+into an [RME Babyface Pro FS](https://rme-audio.de/babyface-pro-fs.html). On the Mac, Mimi only
+exists as a [Chrome extension](https://mimi.io/solutions/mimi-for-chrome), so the
+personalization only reached browser tabs. Music apps, [Live](https://www.ableton.com/en/live/),
+my synth plugins and everything else played without it.
 
-The interface couldn't fill the gap either. TotalMix on the Babyface has a 3-band EQ per output
-(I use it for the headphone's own correction) but no compressor, and an RME compressor would
-not help anyway: it works on the whole signal at once, while Mimi treats each frequency range
-separately.
+The interface couldn't fill the gap either. [TotalMix FX](https://rme-audio.de/totalmix-fx.html)
+on the Babyface has a 3-band EQ per output, which I use for the headphone's own correction
+(a 3-band fit of [oratory1990's Edition XV EQ](https://github.com/jaakkopasanen/AutoEq/issues/992)).
+It has no compressor, and an RME compressor would not help anyway: it works on the whole signal
+at once, while Mimi treats each frequency range separately.
+
+<img src="docs/totalmix-phones-eq.png" width="360" alt="TotalMix FX: the 3-band EQ on the Babyface's phones output">
+
 
 So I measured what Mimi actually does with my profile and rebuilt it as an Audio Unit.
 [SoundSource](https://rogueamoeba.com/soundsource/) runs it on the Babyface output,
@@ -49,7 +57,9 @@ It turned out to be a gentle multiband compressor:
   | full scale (0 dBFS) | −1.4 | −2.1 | −3.4 | −7.3 | −7.8 | −9.1 | 0 |
 
 - **Both channels always get the same gain,** set by the average of the two channels' levels.
-- **It reacts in about 50 ms** and settles within about 200 ms, in both directions.
+- **Its boost follows the music's loudness with a lag of about 50 ms,** and is fully adjusted
+  after about 200 ms, in both directions. That is how fast the gain changes. The sound itself
+  is only delayed by 192 samples (4 ms at 48 kHz).
 - **Richer and Softer have the same shape** at roughly 1.4× and 0.5× the strength.
 - **The intensity slider is a plain dry/wet blend.**
 
@@ -60,7 +70,8 @@ because it relies on Mimi's own code.
 ## How EarComp works
 
 - It splits the audio into short overlapping FFT frames (256 samples, hop 64, the same frame
-  size Mimi uses). That gives a fixed delay of 256 samples, about 5.8 ms at 44.1 kHz.
+  size Mimi uses). Its synthesis window is zero over the first hop, so each output block is
+  complete one hop early: the delay is 192 samples like Mimi's, about 4.4 ms at 44.1 kHz.
 - For every frequency bin it measures the level around it (±1.5 octaves, at least ±2 bins),
   smooths it over about 50 ms, and averages the two channels in dB the way Mimi does.
 - It looks up the gain in the measured tables (`src/MimiTables.h`) and applies it.
@@ -78,6 +89,7 @@ Controls: **Intensity** (0–100 %), **Variant** (Recommended, Richer, Softer),
 - **Pink noise:** about 0.5 dB average error. EarComp gives up to about 1 dB more treble
   around 8 kHz.
 - **Reaction speed:** within a few tenths of a dB at every point after a level step
+- **Delay:** 192 samples, the same as Mimi; with Intensity at 0 the audio passes through unchanged
 
 ## Building and installing
 
@@ -94,7 +106,8 @@ make install    # copy to ~/Library/Audio/Plug-Ins/Components and run auval
 The Makefile uses Xcode's toolchain on purpose: on macOS 27 the Command Line Tools linker
 can't read the SDK's library stubs.
 
-In SoundSource, click **Add Effect** on your output device and pick **EarComp → EarComp**.
+In [SoundSource](https://rogueamoeba.com/soundsource/), click **Add Effect** on your output
+device and pick **EarComp → EarComp**.
 If you also use Mimi's Chrome extension, turn it off, otherwise browser audio is processed twice.
 
 ## Notes

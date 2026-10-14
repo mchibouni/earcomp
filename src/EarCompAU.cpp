@@ -5,20 +5,26 @@
 
 namespace {
 
-enum : AudioUnitParameterID { kParamIntensity = 0, kParamVariant = 1, kParamRightTreble = 2 };
+enum : AudioUnitParameterID { kParamIntensity = 0, kParamVariant = 1, kParamRightTreble = 2, kParamHissGuard = 3 };
 
 struct PresetValues {
-    float intensity, variant, rightTreble;
+    float intensity, variant, rightTreble, hissGuard;
 };
 AUPreset kPresets[] = {
     {0, CFSTR("Mimi match")},
-    {1, CFSTR("Right ear +6 dB")},
-    {2, CFSTR("Right ear +10 dB")},
+    {1, CFSTR("Speakers: Mimi match, hiss guard")},
+    {2, CFSTR("Right ear +6 dB")},
+    {3, CFSTR("Headphones: right ear +6 dB, hiss guard")},
+    {4, CFSTR("Right ear +10 dB")},
+    {5, CFSTR("Headphones: right ear +10 dB, hiss guard")},
 };
 constexpr PresetValues kPresetValues[] = {
-    {100.0f, 0.0f, 0.0f},
-    {100.0f, 0.0f, 6.0f},
-    {100.0f, 0.0f, 10.0f},
+    {100.0f, 0.0f, 0.0f, -100.0f},
+    {100.0f, 0.0f, 0.0f, -60.0f},
+    {100.0f, 0.0f, 6.0f, -100.0f},
+    {100.0f, 0.0f, 6.0f, -60.0f},
+    {100.0f, 0.0f, 10.0f, -100.0f},
+    {100.0f, 0.0f, 10.0f, -60.0f},
 };
 constexpr int kNumPresets = sizeof(kPresetValues) / sizeof(kPresetValues[0]);
 
@@ -77,6 +83,14 @@ public:
             info.maxValue = 12.0f;
             info.defaultValue = 0.0f;
             return noErr;
+        case kParamHissGuard:
+            // below this level boosts fade out over 20 dB so a faint hiss floor isn't lifted; -100 = off
+            FillInParameterName(info, CFSTR("Hiss guard"), false);
+            info.unit = kAudioUnitParameterUnit_Decibels;
+            info.minValue = earcomp::Processor::kHissGuardOff;
+            info.maxValue = -40.0f;
+            info.defaultValue = earcomp::Processor::kHissGuardOff;
+            return noErr;
         default:
             return kAudioUnitErr_InvalidParameter;
         }
@@ -114,6 +128,7 @@ public:
         processor_.intensity.store(GetParameter(kParamIntensity) / 100.0f, std::memory_order_relaxed);
         processor_.variant.store(int(GetParameter(kParamVariant) + 0.5f), std::memory_order_relaxed);
         processor_.rightTrebleDb.store(GetParameter(kParamRightTreble), std::memory_order_relaxed);
+        processor_.hissGuardDb.store(GetParameter(kParamHissGuard), std::memory_order_relaxed);
         processor_.process(static_cast<const float*>(in.mBuffers[0].mData), static_cast<const float*>(in.mBuffers[1].mData),
                            static_cast<float*>(out.mBuffers[0].mData), static_cast<float*>(out.mBuffers[1].mData), int(frames));
         flags &= ~kAudioUnitRenderAction_OutputIsSilence;
@@ -125,6 +140,7 @@ private:
         Globals()->SetParameter(kParamIntensity, kPresetValues[n].intensity);
         Globals()->SetParameter(kParamVariant, kPresetValues[n].variant);
         Globals()->SetParameter(kParamRightTreble, kPresetValues[n].rightTreble);
+        Globals()->SetParameter(kParamHissGuard, kPresetValues[n].hissGuard);
     }
 
     earcomp::Processor processor_;

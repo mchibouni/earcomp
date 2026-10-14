@@ -77,10 +77,27 @@ because it relies on Mimi's own code.
 - It looks up the gain in the measured tables (`src/MimiTables.h`) and applies it.
 - **Right ear treble** (0 to 12 dB) is then added on the right channel. It fades in from
   3 kHz, is at full strength from 5 kHz to 12.5 kHz, and fades out by 16 kHz, where Mimi
-  stops processing.
+  stops processing. It only makes sense on headphones: with speakers both ears hear both
+  speakers, so it just pulls the treble image to the right.
+- **Hiss guard** (optional): below the chosen level, the boosts and the right-ear extra fade
+  out over 20 dB.
 
-Controls: **Intensity** (0–100 %), **Variant** (Recommended, Richer, Softer),
-**Right ear treble** (0–12 dB). Presets: *Mimi match*, *Right ear +6 dB*, *Right ear +10 dB*.
+### Hiss
+
+Mimi boosts quiet treble hard, and the faint hiss in many recordings is quiet treble too.
+A pink-noise floor at −70 dBFS comes out about 16 dB louder above 6 kHz, in Mimi and in
+EarComp alike. Played over everything the Mac outputs, that gets noticeable. With Hiss guard
+at −60 dBFS the lift drops to about 4 dB, while everything from −60 dBFS up is boosted exactly
+as Mimi does. `tools/hiss.cpp` measures this.
+
+### Controls and presets
+
+- **Intensity** (0–100 %), **Variant** (Recommended, Richer, Softer),
+  **Right ear treble** (0–12 dB), **Hiss guard** (−100 = off, up to −40 dBFS)
+- *Mimi match*: identical to Mimi
+- *Speakers: Mimi match, hiss guard*
+- *Headphones: right ear +6 dB, hiss guard* and *+10 dB, hiss guard*
+- *Right ear +6 dB* and *Right ear +10 dB* without the guard
 
 ### How close it gets
 

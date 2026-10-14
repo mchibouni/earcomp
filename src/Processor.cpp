@@ -111,6 +111,8 @@ void Processor::processFrame() {
     const int var = std::clamp(variant.load(std::memory_order_relaxed), 0, kTableVariants - 1);
     const float mix = std::clamp(intensity.load(std::memory_order_relaxed), 0.0f, 1.0f);
     const float rightDb = rightTrebleDb.load(std::memory_order_relaxed);
+    const float guardDb = hissGuardDb.load(std::memory_order_relaxed);
+    const bool guardOn = guardDb > kHissGuardOff;
 
     // analysis
     for (int c = 0; c < 2; ++c) {
@@ -149,8 +151,14 @@ void Processor::processFrame() {
         const auto& T = kGainDb[var];
         float g = lerp(lerp(T[l0][f0], T[l0][f0 + 1], ft), lerp(T[l0 + 1][f0], T[l0 + 1][f0 + 1], ft), lt);
 
+        float right = rightDb * rightRamp_[k];
+        if (guardOn) {  // fade boosts (not cuts) out below the guard level
+            float w = std::clamp((levelDb_[k] - (guardDb - kHissGuardRange)) / kHissGuardRange, 0.0f, 1.0f);
+            if (g > 0.0f) g *= w;
+            right *= w;
+        }
         float wetL = std::pow(10.0f, g / 20.0f);
-        float wetR = std::pow(10.0f, (g + rightDb * rightRamp_[k]) / 20.0f);
+        float wetR = std::pow(10.0f, (g + right) / 20.0f);
         gainL_[k] = (1.0f - mix) + mix * wetL;
         gainR_[k] = (1.0f - mix) + mix * wetR;
     }

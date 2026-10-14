@@ -30,6 +30,11 @@ public:
     std::atomic<float> intensity{1.0f};        // 0..1, dry/wet blend like Mimi's slider
     std::atomic<int> variant{0};               // 0 Recommended, 1 Richer, 2 Softer
     std::atomic<float> rightTrebleDb{0.0f};    // extra gain for the right ear above ~4 kHz
+    // Below this level the boosts (and the right-ear extra) fade out over kHissGuardRange dB,
+    // so a faint hiss floor is not lifted. At or below kHissGuardOff it is disabled (pure Mimi).
+    std::atomic<float> hissGuardDb{-100.0f};
+    static constexpr float kHissGuardOff = -100.0f;
+    static constexpr float kHissGuardRange = 20.0f;
     std::atomic<float> detectOctaves{3.0f};    // level-detector bandwidth (tuned to Mimi)
     std::atomic<float> smoothingMs{50.0f};     // level-detector time constant (tuned to Mimi)
 
